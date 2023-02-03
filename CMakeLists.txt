@@ -74,12 +74,14 @@ CHECK_FUNCTION_EXISTS("gmtime_r" HAVE_GMTIME_R)
 if(${HAVE_GETIFADDRS})
     add_definitions(-DHAVE_GMTIME_R)
 endif()
-add_definitions(-DHAVE_PTHREAD -DHAVE_STRUCT_TIMEVAL)
+add_definitions(-DHAVE_PTHREAD -DHAVE_STRUCT_TIMEVAL -DENABLE_TRACE)
 
 include_directories(3rd/libexosip2-5.3.0/include)
 include_directories(3rd/libosip2-5.3.1/include)
 file(GLOB_RECURSE SipStackSrc 3rd/libexosip2-5.3.0/*.c 3rd/libosip2-5.3.1/*.c)
 add_library(sip STATIC ${SipStackSrc})
 
-add_executable(rtsp2sip main.cpp)
+file(GLOB_RECURSE SRC src/*.c src/*.cpp)
+add_executable(rtsp2sip ${SRC})
+
 target_link_libraries(rtsp2sip sip pthread)

@@ -74,7 +74,7 @@ bool SipClient::StartStack() {
 void SipClient::ProcessEvent() {
     while (m_running) {
         osip_message_t *msg = nullptr;
-        eXosip_event_t *je = eXosip_event_wait(m_context, 0, 1);
+        eXosip_event_t * je = nullptr;
         /* auto process,such as:register refresh,auth,call keep... */
         if (!(je = eXosip_event_wait (m_context, 0, 1)))
         {

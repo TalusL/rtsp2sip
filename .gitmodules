@@ -1,0 +1,3 @@
+[submodule "3rd/ZLMediaKit"]
+	path = 3rd/ZLMediaKit
+	url = https://github.com/ZLMediaKit/ZLMediaKit.git

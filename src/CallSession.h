@@ -19,6 +19,7 @@ public:
 
 class CallSession:public FakeSession {
 public:
+    ~CallSession() override;
     using Ptr = shared_ptr<CallSession>;
     explicit CallSession(const string& remoteSdp,const string& phoneNumber);
     bool Init();

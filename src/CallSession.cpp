@@ -185,3 +185,16 @@ bool CallSession::Stop() {
 string CallSession::getStreamUrl(const string &phoneNumber) {
     return mINI::Instance()["sip_proxy."+phoneNumber];
 }
+
+CallSession::~CallSession() {
+    auto phUn = m_phoneNumber;
+    getPoller()->doDelayTask(1000*10,[phUn](){
+        if(s_proxyMap.find(phUn)!=s_proxyMap.end()){
+            auto src = MediaSource::find(RTSP_SCHEMA,DEFAULT_VHOST,SIP_APP,phUn);
+            if(src&&!src->readerCount()){
+                s_proxyMap.erase(phUn);
+            }
+        }
+       return false;
+    });
+}

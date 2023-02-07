@@ -20,8 +20,8 @@ public:
     void ProcessEvent();
 private:
     int m_expiry = 3600;
-    string m_localPort = "5060";
-    string m_localIp = "192.168.221.55";
+    string m_localPort = "5070";
+    string m_localIp = "10.8.9.244";
     string m_serverIp = "192.168.1.212";
     string m_serverPort = "5060";
     string m_proxy;

@@ -4,6 +4,8 @@
 #include <Util/logger.h>
 #include <Util/mini.h>
 #include <Network/Socket.h>
+#include <csignal>
+
 int main(){
     toolkit::Logger::Instance().add(std::make_shared<toolkit::ConsoleChannel>("ConsoleChannel", toolkit::LTrace));
 
@@ -25,5 +27,14 @@ int main(){
 
 
 
-    this_thread::sleep_for(chrono::seconds(1000));
+    //设置退出信号处理函数
+    static toolkit::semaphore sem;
+    signal(SIGINT, [](int) {
+        InfoL << "SIGINT:exit";
+        signal(SIGINT, SIG_IGN);// 设置退出信号
+        sem.post();
+    });// 设置退出信号
+
+    sem.wait();
+    return 0;
 }

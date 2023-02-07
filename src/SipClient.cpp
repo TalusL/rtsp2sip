@@ -91,7 +91,7 @@ void SipClient::ProcessEvent() {
     while (m_running) {
         eXosip_event_t * msg = nullptr;
         /* auto process,such as:register refresh,auth,call keep... */
-        if (!(msg = eXosip_event_wait (m_context, 0, 1)))
+        if (!(msg = eXosip_event_wait (m_context, 0, 10)))
         {
             eXosip_automatic_action (m_context);
             continue;

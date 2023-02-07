@@ -97,6 +97,7 @@ add_subdirectory(3rd/ZLMediaKit)
 
 set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -Os -Wall -s")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -Os -Wall -s")
+set(CMAKE_EXE_LINKER_FLAGS "-static")
 
 file(GLOB_RECURSE SRC src/*.c src/*.cpp)
 add_executable(rtsp2sip ${SRC})

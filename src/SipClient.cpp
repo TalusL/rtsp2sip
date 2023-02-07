@@ -125,6 +125,7 @@ void SipClient::ProcessEvent() {
                     if (OSIP_SUCCESS != ret){
                         eXosip_call_send_answer(m_context, je->tid, 400, respMsg);
                     }
+                    eXosip_call_terminate(m_context,je->cid,je->did);
                 }
             }
                 break;
@@ -139,6 +140,7 @@ void SipClient::ProcessEvent() {
                 if(g_sessionMap.find(to_string(je->cid)) != g_sessionMap.end()){
                     g_sessionMap[to_string(je->cid)]->Stop();
                 }
+                g_sessionMap.erase(to_string(je->cid));
             }
             break;
             case EXOSIP_CALL_MESSAGE_NEW:{

@@ -83,7 +83,20 @@ include_directories(3rd/ZLMediaKit/3rdpart/ZLToolKit/src)
 file(GLOB_RECURSE SipStackSrc 3rd/libexosip2-5.3.0/*.c 3rd/libosip2-5.3.1/*.c)
 add_library(sip STATIC ${SipStackSrc})
 
+set(ENABLE_OPENSSL OFF CACHE BOOL "")
+set(ENABLE_HLS OFF CACHE BOOL "")
+set(ENABLE_MP4 OFF CACHE BOOL "")
+set(ENABLE_PLAYER OFF CACHE BOOL "")
+set(ENABLE_SERVER OFF CACHE BOOL "")
+set(ENABLE_SRT OFF CACHE BOOL "")
+set(ENABLE_TESTS OFF CACHE BOOL "")
+set(ENABLE_SCTP OFF CACHE BOOL "")
+set(ENABLE_WEBRTC OFF CACHE BOOL "")
 add_subdirectory(3rd/ZLMediaKit)
+
+
+set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -Os -Wall -s")
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -Os -Wall -s")
 
 file(GLOB_RECURSE SRC src/*.c src/*.cpp)
 add_executable(rtsp2sip ${SRC})

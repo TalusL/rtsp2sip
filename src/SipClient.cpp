@@ -6,36 +6,11 @@
 #include "SipClient.h"
 #include <cstring>
 #include <iostream>
-#include <Player/PlayerProxy.h>
-#include <Network/Session.h>
-
-using namespace mediakit;
-using namespace toolkit;
+#include <map>
+#include "CallSession.h"
 
 
-int allocUdpPort(){
-    auto sock = Socket::createSocket();
-    sock->bindUdpSock(0);
-    int port = sock->get_local_port();
-    sock->closeSock();
-    return port;
-}
-
-std::pair<int,int> videoPair {0,0};
-std::pair<int,int> audioPair {0,0};
-string destHost;
-
-
-MediaPlayer::Ptr mediaPlayer;
-class FakeSession : public Session{
-public:
-    explicit FakeSession(const Socket::Ptr& ptr) :  Session(ptr){}
-    void onRecv(const Buffer::Ptr &buf) override {}
-    void onError(const SockException &err) override {}
-    void onManager() override {}
-};
-
-static FakeSession::Ptr session;
+map<string,CallSession::Ptr> g_sessionMap;
 
 
 static int
@@ -78,7 +53,6 @@ SipClient::SipClient() {
     m_from = "sip:"+m_username+"@"+m_localIp+":"+m_localPort;
     m_proxy = "sip:"+m_username+"@"+m_serverIp+":"+m_serverPort;
 
-    session = make_shared<FakeSession>(Socket::createSocket());
 }
 
 
@@ -125,110 +99,28 @@ void SipClient::ProcessEvent() {
             }
         }
         switch (je->type) {
-            case EXOSIP_REGISTRATION_SUCCESS:
-                break;
-            case EXOSIP_REGISTRATION_FAILURE:
-                break;
             case EXOSIP_CALL_INVITE: {
-                ProtocolOption option;
-                mediaPlayer = std::make_shared<PlayerProxy>(DEFAULT_VHOST, "SIP", "8003", option, 2);
-                mediaPlayer->play("rtsp://admin:XXXXX@192.168.1.186/h264/ch1/main/av_stream");
-//                mediaPlayer->play("rtsp://admin:XXXXX@192.168.1.151/stream=0");
-                MediaInfo info;
-                info._streamid = "8003";
-                info._vhost = DEFAULT_VHOST;
-                info._app = "SIP";
-                info._schema = RTSP_SCHEMA;
-                this_thread::sleep_for(chrono::seconds(5));
-                MediaSource::findAsync(info, session, [this,body,je](const std::shared_ptr<MediaSource> &src) {
-                    if(src){
-                        sdp_message_t remoteSdp{};
-                        if(sdp_message_parse(&remoteSdp,body.c_str())!=OSIP_SUCCESS){
-                            return;
-                        }
-                        stringstream localSdp;
-                        localSdp<<"v=0\r\n";
-                        localSdp<<"o="<<remoteSdp.o_username<<" "<<remoteSdp.o_sess_id<<" "<<remoteSdp.o_sess_version<<" IN IP4 "<<m_localIp<<"\r\n";
-                        localSdp<<"s=TalusIPC\r\n";
-                        localSdp<<"c=IN IP4 "<<m_localIp<<"\r\n";
-                        localSdp<<"t=0 0\r\n";
-                        auto tracks = src->getTracks(false);
-                        for (const auto &item: tracks){
-                            int port = allocUdpPort();
-                            auto sdp = item->getSdp()->getSdp();
-                            if(item->getCodecId() == mediakit::CodecH264){
-                                replace(sdp,"96","99");
-                            }
-                            replace(sdp,"0 RTP/AVP", to_string(port)+" RTP/AVP");
-                            localSdp<< sdp;
-                            if(item->getTrackType()==TrackAudio){
-                                audioPair.first = port;
-                                audioPair.second = atoi(eXosip_get_audio_media(&remoteSdp)->m_port);
-                                destHost = remoteSdp.c_connection->c_addr;
-                                localSdp<<"a=sendrecv\r\n";
-
-                            }
-                            if(item->getTrackType()==TrackVideo){
-                                videoPair.first = port;
-                                videoPair.second = atoi(eXosip_get_video_media(&remoteSdp)->m_port);
-                                destHost = remoteSdp.c_connection->c_addr;
-                                localSdp<<"a=sendonly\r\n";
-                            }
-                        }
-                        InfoL<<"\n"<<localSdp.str();
-                        osip_message_t *msg = nullptr;
-                        int ret = eXosip_call_build_answer(m_context, je->tid, 200, &msg);
-                        if (OSIP_SUCCESS != ret){
-                            return;
-                        }
-                        osip_message_set_body(msg, localSdp.str().c_str(), localSdp.str().length());
-                        osip_message_set_content_type(msg, "application/sdp");
-
-                        ret = eXosip_call_send_answer(m_context, je->tid, 200, msg);
-                        if (OSIP_SUCCESS != ret){
-                            return;
-                        }
-                        return;
+                CallSession::Ptr session = make_shared<CallSession>(body,m_localIp,je->request->to->url->username);
+                osip_message_t *respMsg = nullptr;
+                if(session->Init()){
+                    auto sdp = session->GetLocalSdp();
+                    int ret = eXosip_call_build_answer(m_context, je->tid, 200, &respMsg);
+                    if (OSIP_SUCCESS != ret){
+                        osip_message_set_body(respMsg, sdp.c_str(), sdp.length());
+                        osip_message_set_content_type(respMsg, "application/sdp");
+                        eXosip_call_send_answer(m_context, je->tid, 200, respMsg);
                     }
-                });
+                    g_sessionMap[to_string(je->cid)] = session;
+                }else{
+                    int ret = eXosip_call_build_answer(m_context, je->tid, 400, &respMsg);
+                    if (OSIP_SUCCESS != ret){
+                        eXosip_call_send_answer(m_context, je->tid, 400, respMsg);
+                    }
+                }
             }
                 break;
             case EXOSIP_CALL_ACK:{
-                MediaInfo info;
-                info._streamid = "8003";
-                info._vhost = DEFAULT_VHOST;
-                info._app = "SIP";
-                info._schema = RTSP_SCHEMA;
-                auto src = MediaSource::find(info);
-                if(src){
-                    MediaSourceEvent::SendRtpArgs args;
-                    if(audioPair.first&&audioPair.second){
-                        args.dst_port = audioPair.second;
-                        args.src_port = audioPair.first;
-                        args.dst_url = destHost;
-                        args.only_audio = true;
-                        args.is_udp = true;
-                        args.use_ps = false;
-                        args.pt = 0;
-                        args.ssrc = to_string(audioPair.first);
-                        src->startSendRtp(args, [](uint16_t, const toolkit::SockException & e){
-                            InfoL<<"audio start! "<<e.what();
-                        });
-                    }
-                    if(videoPair.first&&videoPair.second){
-                        args.dst_port = videoPair.second;
-                        args.src_port = videoPair.first;
-                        args.dst_url = destHost;
-                        args.only_audio = false;
-                        args.is_udp = true;
-                        args.use_ps = false;
-                        args.pt = 99;
-                        args.ssrc = to_string(videoPair.first);
-                        src->startSendRtp(args, [](uint16_t, const toolkit::SockException &e){
-                            InfoL<<"video start! "<<e.what();
-                        });
-                    }
-                }
+
             }
             break;
             case EXOSIP_CALL_MESSAGE_NEW:{
@@ -236,24 +128,6 @@ void SipClient::ProcessEvent() {
                 eXosip_call_build_answer(m_context,je->tid,200,&resp);
                 eXosip_call_send_answer(m_context,je->tid,200,resp);
             };
-                break;
-            case EXOSIP_CALL_RINGING:
-                break;
-            case EXOSIP_CALL_ANSWERED:
-                break;
-            case EXOSIP_CALL_NOANSWER:
-                break;
-            case EXOSIP_CALL_REQUESTFAILURE:
-            case EXOSIP_CALL_GLOBALFAILURE:
-            case EXOSIP_CALL_SERVERFAILURE:
-                break;
-            case EXOSIP_CALL_CLOSED:
-                break;
-            case EXOSIP_CALL_CANCELLED:
-                break;
-            case EXOSIP_CALL_RELEASED:
-                break;
-            case EXOSIP_IN_SUBSCRIPTION_NEW:
                 break;
             case EXOSIP_MESSAGE_NEW:
                 if(je->request&&je->request->sip_method==string("OPTIONS")){

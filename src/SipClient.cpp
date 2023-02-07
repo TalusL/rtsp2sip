@@ -49,6 +49,15 @@ bool SipClient::sendResponse(const eXosip_event_t*  osipEvent, int StatusCode)
 }
 
 SipClient::SipClient() {
+
+    m_expiry = toolkit::mINI::Instance()["sip.expiry"];
+    m_localPort = toolkit::mINI::Instance()["sip.localPort"];
+    m_localIp  = toolkit::mINI::Instance()["sip.localIp"] ;
+    m_serverIp = toolkit::mINI::Instance()["sip.serverIp"];
+    m_serverPort = toolkit::mINI::Instance()["sip.serverPort"] ;
+    m_username = toolkit::mINI::Instance()["sip.username"] ;
+    m_password = toolkit::mINI::Instance()["sip.password"] ;
+
     m_to = "sip:"+m_username+"@"+m_serverIp+":"+m_serverPort;
     m_from = "sip:"+m_username+"@"+m_localIp+":"+m_localPort;
     m_proxy = "sip:"+m_username+"@"+m_serverIp+":"+m_serverPort;
@@ -105,7 +114,7 @@ void SipClient::ProcessEvent() {
                 if(session->Init()){
                     auto sdp = session->GetLocalSdp();
                     int ret = eXosip_call_build_answer(m_context, je->tid, 200, &respMsg);
-                    if (OSIP_SUCCESS != ret){
+                    if (OSIP_SUCCESS == ret){
                         osip_message_set_body(respMsg, sdp.c_str(), sdp.length());
                         osip_message_set_content_type(respMsg, "application/sdp");
                         eXosip_call_send_answer(m_context, je->tid, 200, respMsg);
@@ -120,7 +129,16 @@ void SipClient::ProcessEvent() {
             }
                 break;
             case EXOSIP_CALL_ACK:{
-
+                if(g_sessionMap.find(to_string(je->cid)) != g_sessionMap.end()){
+                    g_sessionMap[to_string(je->cid)]->Start();
+                }
+            }
+            break;
+            case EXOSIP_CALL_CANCELLED:
+            case EXOSIP_CALL_CLOSED:{
+                if(g_sessionMap.find(to_string(je->cid)) != g_sessionMap.end()){
+                    g_sessionMap[to_string(je->cid)]->Stop();
+                }
             }
             break;
             case EXOSIP_CALL_MESSAGE_NEW:{

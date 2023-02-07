@@ -20,14 +20,14 @@ public:
     void ProcessEvent();
 private:
     int m_expiry = 3600;
-    string m_localPort = "5070";
-    string m_localIp = "10.8.9.244";
-    string m_serverIp = "192.168.1.212";
-    string m_serverPort = "5060";
+    string m_localPort;
+    string m_localIp;
+    string m_serverIp;
+    string m_serverPort;
     string m_proxy;
     string m_outboundProxy;
-    string m_username = "8003";
-    string m_password = "8003";
+    string m_username;
+    string m_password;
     string m_from;
     string m_to;
 

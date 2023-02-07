@@ -4,6 +4,7 @@
 #include "osipparser2/osip_port.h"
 #include "eXosip2/eXosip.h"
 #include <Util/mini.h>
+#include <regex>
 
 #define SIP_APP "SIP"
 
@@ -74,22 +75,45 @@ string CallSession::GetLocalSdp() {
         localSdp << "c=IN IP4 " << m_localIp << "\r\n";
         localSdp << "t=0 0\r\n";
         auto tracks = src->getTracks();
+
+        auto getSdpLine = [](const string& sdp,
+                const string& codecName,int& pt,string& rtpmapLine,string& fmtpLine,string& profile){
+            auto sdpLines = toolkit::split(sdp,"\r\n");
+            for (const auto &item: sdpLines){
+                if(item.find(codecName)!=string::npos){
+                    sscanf(item.c_str(),"a=rtpmap:%d",&pt);
+                    rtpmapLine = item;
+                }
+                if(item.find("fmtp:"+ to_string(pt))!=string::npos){
+                    fmtpLine = item;
+                    smatch r;
+                    if(regex_search(item,r,regex("profile-level-id=([0-9a-fA-F]+)"))){
+                        profile = r.str(1);
+                    }
+                }
+            }
+        };
+
         for (const auto &item: tracks) {
+            int pt;
+            string rtpmapLine,fmtpLine,profile;
             if(item->getTrackType() == TrackVideo){
                 if (!m_localVideoPort) {
                     continue;
                 }
-                auto sdp = item->getSdp();
-                auto strStr = sdp->getSdp();
-                replace(strStr, to_string(sdp->getPayloadType()), "99");
-                replace(strStr, "0 RTP/AVP", to_string(m_localVideoPort) + " RTP/AVP");
-                localSdp << strStr;
+                getSdpLine(m_remoteSdpStr,item->getCodecName(),pt,rtpmapLine,fmtpLine,profile);
+                localSdp <<"m=video "<<m_localVideoPort<<" RTP/AVP "<<pt<<"\r\n";
+                localSdp << rtpmapLine << "\r\n";
+                localSdp <<"a="
+                           "fmtp:"<<pt;
+                getSdpLine(item->getSdp()->getSdp(),item->getCodecName(),pt,rtpmapLine,fmtpLine,profile);
+                localSdp <<" profile-level-id="<<profile<<"\r\n";
                 localSdp << "a=sendonly\r\n";
             }
             if (item->getTrackType() == TrackAudio) {
-                auto sdp = item->getSdp();
-                auto strStr = sdp->getSdp();
-                localSdp << strStr;
+                getSdpLine(m_remoteSdpStr,item->getCodecName(),pt,rtpmapLine,fmtpLine,profile);
+                localSdp <<"m=audio "<<m_localAudioPort<<" RTP/AVP "<<pt<<"\r\n";
+                localSdp << rtpmapLine << "\r\n";
                 localSdp << "a=sendrecv\r\n";
 
             }
@@ -107,46 +131,55 @@ string CallSession::GetLocalSdp() {
 }
 
 bool CallSession::Start() {
-//    MediaInfo info;
-//    info._streamid = "8003";
-//    info._vhost = DEFAULT_VHOST;
-//    info._app = "SIP";
-//    info._schema = RTSP_SCHEMA;
-//    auto src = MediaSource::find(info);
-//    if(src){
-//        MediaSourceEvent::SendRtpArgs args;
-//        if(audioPair.first&&audioPair.second){
-//            args.dst_port = audioPair.second;
-//            args.src_port = audioPair.first;
-//            args.dst_url = destHost;
-//            args.only_audio = true;
-//            args.is_udp = true;
-//            args.use_ps = false;
-//            args.pt = 0;
-//            args.ssrc = to_string(audioPair.first);
-//            src->startSendRtp(args, [](uint16_t, const toolkit::SockException & e){
-//                InfoL<<"audio start! "<<e.what();
-//            });
-//        }
-//        if(videoPair.first&&videoPair.second){
-//            args.dst_port = videoPair.second;
-//            args.src_port = videoPair.first;
-//            args.dst_url = destHost;
-//            args.only_audio = false;
-//            args.is_udp = true;
-//            args.use_ps = false;
-//            args.pt = 99;
-//            args.ssrc = to_string(videoPair.first);
-//            src->startSendRtp(args, [](uint16_t, const toolkit::SockException &e){
-//                InfoL<<"video start! "<<e.what();
-//            });
-//        }
-//    }
-    return false;
+    if(!m_localVideoPort&&!m_localAudioPort){
+        return false;
+    }
+    MediaInfo info;
+    info._streamid = m_phoneNumber;
+    info._vhost = DEFAULT_VHOST;
+    info._app = SIP_APP;
+    info._schema = RTSP_SCHEMA;
+    auto src = MediaSource::find(info);
+    if(src){
+        MediaSourceEvent::SendRtpArgs args;
+        if(m_localAudioPort){
+            args.dst_port = m_remoteAudioPort;
+            args.src_port = m_localAudioPort;
+            args.dst_url = m_mediaDestHost;
+            args.only_audio = true;
+            args.is_udp = true;
+            args.use_ps = false;
+            args.pt = 0;
+            args.ssrc = to_string(m_localAudioPort);
+            src->startSendRtp(args, [](uint16_t, const toolkit::SockException & e){
+                InfoL<<"audio start! "<<e.what();
+            });
+        }
+        if(m_localVideoPort){
+            args.dst_port = m_remoteVideoPort;
+            args.src_port = m_localVideoPort;
+            args.dst_url = m_mediaDestHost;
+            args.only_audio = false;
+            args.is_udp = true;
+            args.use_ps = false;
+            args.pt = 99;
+            args.ssrc = to_string(m_localVideoPort);
+            src->startSendRtp(args, [](uint16_t, const toolkit::SockException &e){
+                InfoL<<"video start! "<<e.what();
+            });
+        }
+    }
+    return true;
 }
 
 bool CallSession::Stop() {
-    return false;
+    auto src = MediaSource::find(RTSP_SCHEMA,DEFAULT_VHOST,SIP_APP,m_phoneNumber);
+    if(!src){
+        return true;
+    }
+    src->stopSendRtp(to_string(m_localVideoPort));
+    src->stopSendRtp(to_string(m_localAudioPort));
+    return true;
 }
 
 string CallSession::getStreamUrl(const string &phoneNumber) {

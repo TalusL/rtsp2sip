@@ -21,9 +21,9 @@ int allocUdpPort(){
     return port;
 }
 
-CallSession::CallSession(const string &remoteSdp,const string& localIp,const string& phoneNumber) {
+CallSession::CallSession(const string &remoteSdp,const string& phoneNumber) {
     m_remoteSdpStr = remoteSdp;
-    m_localIp = localIp;
+    m_localIp  = toolkit::mINI::Instance()["sip.localIp"];
     m_phoneNumber = phoneNumber;
 }
 
@@ -123,8 +123,8 @@ string CallSession::GetLocalSdp() {
     MediaSource::findAsync(info, this->shared_from_this(), [&](const std::shared_ptr<MediaSource> &src) {
         if (src) {
             m_localSdpStr = genSdp(src);
-            sem.post();
         }
+        sem.post();
     });
     sem.wait();
     return m_localSdpStr;

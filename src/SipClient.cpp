@@ -109,10 +109,10 @@ void SipClient::ProcessEvent() {
         }
         switch (je->type) {
             case EXOSIP_CALL_INVITE: {
-                CallSession::Ptr session = make_shared<CallSession>(body,m_localIp,je->request->to->url->username);
+                CallSession::Ptr session = make_shared<CallSession>(body,je->request->to->url->username);
                 osip_message_t *respMsg = nullptr;
-                if(session->Init()){
-                    auto sdp = session->GetLocalSdp();
+                string sdp;
+                if(session->Init()&&!(sdp = session->GetLocalSdp()).empty()){
                     int ret = eXosip_call_build_answer(m_context, je->tid, 200, &respMsg);
                     if (OSIP_SUCCESS == ret){
                         osip_message_set_body(respMsg, sdp.c_str(), sdp.length());

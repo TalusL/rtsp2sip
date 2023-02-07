@@ -20,7 +20,7 @@ public:
 class CallSession:public FakeSession {
 public:
     using Ptr = shared_ptr<CallSession>;
-    explicit CallSession(const string& remoteSdp,const string& localIp,const string& phoneNumber);
+    explicit CallSession(const string& remoteSdp,const string& phoneNumber);
     bool Init();
     string GetLocalSdp();
     bool Start();

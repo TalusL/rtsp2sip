@@ -132,8 +132,8 @@ void SipClient::ProcessEvent() {
             case EXOSIP_CALL_INVITE: {
                 ProtocolOption option;
                 mediaPlayer = std::make_shared<PlayerProxy>(DEFAULT_VHOST, "SIP", "8003", option, 2);
-//                mediaPlayer->play("rtsp://admin:xxxx@192.168.1.186/h264/ch1/main/av_stream");
-                mediaPlayer->play("rtsp://admin:xxxx@192.168.1.151/stream=0");
+                mediaPlayer->play("rtsp://admin:XXXXX@192.168.1.186/h264/ch1/main/av_stream");
+//                mediaPlayer->play("rtsp://admin:XXXXX@192.168.1.151/stream=0");
                 MediaInfo info;
                 info._streamid = "8003";
                 info._vhost = DEFAULT_VHOST;
@@ -161,16 +161,18 @@ void SipClient::ProcessEvent() {
                             }
                             replace(sdp,"0 RTP/AVP", to_string(port)+" RTP/AVP");
                             localSdp<< sdp;
-                            localSdp<<"a=sendonly\r\n";
-                            if(item->getTrackType()==TrackVideo){
+                            if(item->getTrackType()==TrackAudio){
                                 audioPair.first = port;
                                 audioPair.second = atoi(eXosip_get_audio_media(&remoteSdp)->m_port);
                                 destHost = remoteSdp.c_connection->c_addr;
+                                localSdp<<"a=sendrecv\r\n";
+
                             }
-                            if(item->getTrackType()==TrackAudio){
+                            if(item->getTrackType()==TrackVideo){
                                 videoPair.first = port;
                                 videoPair.second = atoi(eXosip_get_video_media(&remoteSdp)->m_port);
                                 destHost = remoteSdp.c_connection->c_addr;
+                                localSdp<<"a=sendonly\r\n";
                             }
                         }
                         InfoL<<"\n"<<localSdp.str();
@@ -208,8 +210,9 @@ void SipClient::ProcessEvent() {
                         args.is_udp = true;
                         args.use_ps = false;
                         args.pt = 0;
+                        args.ssrc = to_string(audioPair.first);
                         src->startSendRtp(args, [](uint16_t, const toolkit::SockException & e){
-
+                            InfoL<<"audio start! "<<e.what();
                         });
                     }
                     if(videoPair.first&&videoPair.second){
@@ -220,8 +223,9 @@ void SipClient::ProcessEvent() {
                         args.is_udp = true;
                         args.use_ps = false;
                         args.pt = 99;
+                        args.ssrc = to_string(videoPair.first);
                         src->startSendRtp(args, [](uint16_t, const toolkit::SockException &e){
-
+                            InfoL<<"video start! "<<e.what();
                         });
                     }
                 }

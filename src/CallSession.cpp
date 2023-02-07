@@ -53,6 +53,19 @@ bool CallSession::Init() {
         }
         mediaPlayer->play(url);
         s_proxyMap[m_phoneNumber] = mediaPlayer;
+        {
+            auto phUn = m_phoneNumber;
+            getPoller()->doDelayTask(1000*10,[phUn](){
+                if(s_proxyMap.find(phUn)!=s_proxyMap.end()){
+                    auto src = MediaSource::find(RTSP_SCHEMA,DEFAULT_VHOST,SIP_APP,phUn);
+                    if(src&&!src->totalReaderCount()){
+                        s_proxyMap.erase(phUn);
+                        return false;
+                    }
+                }
+                return true;
+            });
+        }
     }
     return true;
 }
@@ -66,7 +79,7 @@ string CallSession::GetLocalSdp() {
 
     toolkit::semaphore sem;
 
-    auto genSdp = [&](const std::shared_ptr<MediaSource> &src){
+    auto genSdp = [this](const std::shared_ptr<MediaSource> &src){
         stringstream localSdp;
         localSdp << "v=0\r\n";
         localSdp << "o=" << m_phoneNumber << " " << m_remoteSdp.o_sess_id << " "
@@ -122,9 +135,31 @@ string CallSession::GetLocalSdp() {
     };
     MediaSource::findAsync(info, this->shared_from_this(), [&](const std::shared_ptr<MediaSource> &src) {
         if (src) {
-            m_localSdpStr = genSdp(src);
+            auto waitEnd = getCurrentMillisecond() + 10000;
+            getPoller()->doDelayTask(100,[&,src](){
+                if(m_localVideoPort&&!src->getTrack(TrackType::TrackVideo)&&getCurrentMillisecond()<waitEnd){
+                    return true;
+                }
+                if(m_localAudioPort&&!src->getTrack(TrackType::TrackAudio)&&getCurrentMillisecond()<waitEnd ){
+                    return true;
+                }
+                auto aTrack = src->getTrack(TrackType::TrackAudio);
+                auto vTrack = src->getTrack(TrackType::TrackVideo);
+                if(aTrack){
+                    if (!aTrack->ready()&&getCurrentMillisecond()<waitEnd){
+                        return true;
+                    }
+                }
+                if(vTrack){
+                    if (!vTrack->ready()&&getCurrentMillisecond()<waitEnd){
+                        return true;
+                    }
+                }
+                m_localSdpStr = genSdp(src);
+                sem.post();
+                return false;
+            });
         }
-        sem.post();
     });
     sem.wait();
     return m_localSdpStr;
@@ -187,14 +222,4 @@ string CallSession::getStreamUrl(const string &phoneNumber) {
 }
 
 CallSession::~CallSession() {
-    auto phUn = m_phoneNumber;
-    getPoller()->doDelayTask(1000*10,[phUn](){
-        if(s_proxyMap.find(phUn)!=s_proxyMap.end()){
-            auto src = MediaSource::find(RTSP_SCHEMA,DEFAULT_VHOST,SIP_APP,phUn);
-            if(src&&!src->readerCount()){
-                s_proxyMap.erase(phUn);
-            }
-        }
-       return false;
-    });
 }

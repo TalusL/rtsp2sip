@@ -109,7 +109,7 @@ void SipClient::ProcessEvent() {
         }
         switch (je->type) {
             case EXOSIP_CALL_INVITE: {
-                CallSession::Ptr session = make_shared<CallSession>(body,je->request->to->url->username);
+                CallSession::Ptr session = make_shared<CallSession>(body,je->request->to->url->username,je->request->from->url->username);
                 osip_message_t *respMsg = nullptr;
                 string sdp;
                 if(session->Init()&&!(sdp = session->GetLocalSdp()).empty()){

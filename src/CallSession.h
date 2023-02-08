@@ -21,9 +21,9 @@ class CallSession:public FakeSession {
 public:
     ~CallSession() override;
     using Ptr = shared_ptr<CallSession>;
-    explicit CallSession(const string& remoteSdp,const string& phoneNumber);
+    explicit CallSession(const string& remoteSdp,const string& localPhoneNumber,const string& remotePhoneNumber);
     bool Init();
-    string GetLocalSdp();
+    string GetLocalSdp(bool recvRemoteAudio = true,bool recvRemoteVideo = true);
     bool Start();
     bool Stop();
 private:
@@ -32,15 +32,20 @@ private:
     string m_remoteSdpStr;
     string m_localSdpStr;
     string m_localIp;
-    string m_phoneNumber;
+    string m_localPhoneNumber;
+    string m_remotePhoneNumber;
     int m_localAudioPort{};
     int m_remoteAudioPort{};
     int m_localVideoPort{};
     int m_remoteVideoPort{};
     int m_sendVideoPt = 99;
     int m_sendAudioPt = 0;
+    bool m_recvRemoteAudio = true;
+    bool m_recvRemoteVideo = false;
 
     static string getStreamUrl(const string& phoneNumber);
+
+    void updatePt();
 };
 
 

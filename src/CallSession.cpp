@@ -21,10 +21,11 @@ int allocUdpPort(){
     return port;
 }
 
-CallSession::CallSession(const string &remoteSdp,const string& phoneNumber) {
+CallSession::CallSession(const string &remoteSdp,const string& localPhoneNumber,const string& remotePhoneNumber) {
     m_remoteSdpStr = remoteSdp;
     m_localIp  = toolkit::mINI::Instance()["sip.localIp"];
-    m_phoneNumber = phoneNumber;
+    m_localPhoneNumber = localPhoneNumber;
+    m_remotePhoneNumber = remotePhoneNumber;
 }
 
 bool CallSession::Init() {
@@ -43,18 +44,18 @@ bool CallSession::Init() {
         return false;
     }
     m_mediaDestHost = m_remoteSdp.c_connection->c_addr;
-    auto src = MediaSource::find(RTSP_SCHEMA,DEFAULT_VHOST,SIP_APP,m_phoneNumber);
+    auto src = MediaSource::find(RTSP_SCHEMA, DEFAULT_VHOST, SIP_APP, m_localPhoneNumber);
     if(!src){
         ProtocolOption option;
-        PlayerProxy::Ptr mediaPlayer = std::make_shared<PlayerProxy>(DEFAULT_VHOST, SIP_APP, m_phoneNumber, option, 2);
-        auto url = getStreamUrl(m_phoneNumber);
+        PlayerProxy::Ptr mediaPlayer = std::make_shared<PlayerProxy>(DEFAULT_VHOST, SIP_APP, m_localPhoneNumber, option, 2);
+        auto url = getStreamUrl(m_localPhoneNumber);
         if(url.empty()){
             return false;
         }
         mediaPlayer->play(url);
-        s_proxyMap[m_phoneNumber] = mediaPlayer;
+        s_proxyMap[m_localPhoneNumber] = mediaPlayer;
         {
-            auto phUn = m_phoneNumber;
+            auto phUn = m_localPhoneNumber;
             getPoller()->doDelayTask(1000*10,[phUn](){
                 if(s_proxyMap.find(phUn)!=s_proxyMap.end()){
                     auto src = MediaSource::find(RTSP_SCHEMA,DEFAULT_VHOST,SIP_APP,phUn);
@@ -70,19 +71,22 @@ bool CallSession::Init() {
     return true;
 }
 
-string CallSession::GetLocalSdp() {
+string CallSession::GetLocalSdp(bool recvRemoteAudio,bool recvRemoteVideo) {
     MediaInfo info;
-    info._streamid = m_phoneNumber;
+    info._streamid = m_localPhoneNumber;
     info._vhost = DEFAULT_VHOST;
     info._app = SIP_APP;
     info._schema = RTSP_SCHEMA;
 
+    m_recvRemoteAudio = recvRemoteAudio;
+    m_recvRemoteVideo = recvRemoteVideo;
+
     toolkit::semaphore sem;
 
-    auto genSdp = [this](const std::shared_ptr<MediaSource> &src){
+    auto genSdp = [this](const std::shared_ptr<MediaSource> &src,bool recvRemoteAudio,bool recvRemoteVideo){
         stringstream localSdp;
         localSdp << "v=0\r\n";
-        localSdp << "o=" << m_phoneNumber << " " << m_remoteSdp.o_sess_id << " "
+        localSdp << "o=" << m_localPhoneNumber << " " << m_remoteSdp.o_sess_id << " "
                  << m_remoteSdp.o_sess_version << " IN IP4 " << m_localIp << "\r\n";
         localSdp << "s=TalusIPC\r\n";
         localSdp << "c=IN IP4 " << m_localIp << "\r\n";
@@ -90,7 +94,8 @@ string CallSession::GetLocalSdp() {
         auto tracks = src->getTracks();
 
         auto getSdpLine = [](const string& sdp,
-                const string& codecName,int& pt,string& rtpmapLine,string& fmtpLine,string& profile){
+                const string& codecName,int& pt,string& rtpmapLine,string& fmtpLine,
+                string& profile,string& audioTransportType,string& videoTransportType){
             auto sdpLines = toolkit::split(sdp,"\r\n");
             for (const auto &item: sdpLines){
                 if(item.find(codecName)!=string::npos){
@@ -105,32 +110,50 @@ string CallSession::GetLocalSdp() {
                     }
                 }
             }
+            {
+                smatch ar;
+                if(regex_search(sdp,ar,regex("m=audio[\\S\\s]*?(sendonly|recvonly|sendrecv)"))){
+                    audioTransportType = ar.str(1);
+                }
+                smatch vr;
+                if(regex_search(sdp,vr,regex("m=video[\\S\\s]*?(sendonly|recvonly|sendrecv)"))){
+                    videoTransportType = vr.str(1);
+                }
+            }
         };
 
+        int pt;
+        string rtpmapLine,fmtpLine,profile,audioTransportType,videoTransportType;
+        static map<string,string> transportMap = {{"sendrecv","sendrecv"},{"sendonly","recvonly"},{"recvonly","sendonly"}};
         for (const auto &item: tracks) {
-            int pt;
-            string rtpmapLine,fmtpLine,profile;
             if(item->getTrackType() == TrackVideo){
                 if (!m_localVideoPort) {
                     continue;
                 }
-                getSdpLine(m_remoteSdpStr,item->getCodecName(),pt,rtpmapLine,fmtpLine,profile);
+                getSdpLine(m_remoteSdpStr,item->getCodecName(),pt,rtpmapLine,fmtpLine,profile,audioTransportType,videoTransportType);
                 m_sendVideoPt = pt;
                 localSdp <<"m=video "<<m_localVideoPort<<" RTP/AVP "<<pt<<"\r\n";
                 localSdp << rtpmapLine << "\r\n";
                 localSdp <<"a="
                            "fmtp:"<<pt;
-                getSdpLine(item->getSdp()->getSdp(),item->getCodecName(),pt,rtpmapLine,fmtpLine,profile);
+                getSdpLine(item->getSdp()->getSdp(),item->getCodecName(),pt,rtpmapLine,fmtpLine,profile,audioTransportType,videoTransportType);
                 localSdp <<" profile-level-id="<<profile<<"\r\n";
-                localSdp << "a=sendonly\r\n";
+                if(recvRemoteVideo){
+                    localSdp << "a="<<transportMap[videoTransportType]<<"\r\n";
+                }else{
+                    localSdp << "a=sendonly\r\n";
+                }
             }
             if (item->getTrackType() == TrackAudio) {
-                getSdpLine(m_remoteSdpStr,item->getCodecName(),pt,rtpmapLine,fmtpLine,profile);
+                getSdpLine(m_remoteSdpStr,item->getCodecName(),pt,rtpmapLine,fmtpLine,profile,audioTransportType,videoTransportType);
                 m_sendAudioPt = pt;
                 localSdp <<"m=audio "<<m_localAudioPort<<" RTP/AVP "<<pt<<"\r\n";
                 localSdp << rtpmapLine << "\r\n";
-                localSdp << "a=sendrecv\r\n";
-
+                if(recvRemoteAudio){
+                    localSdp << "a="<<transportMap[audioTransportType]<<"\r\n";
+                }else{
+                    localSdp << "a=sendonly\r\n";
+                }
             }
         }
         return localSdp.str();
@@ -157,7 +180,7 @@ string CallSession::GetLocalSdp() {
                         return true;
                     }
                 }
-                m_localSdpStr = genSdp(src);
+                m_localSdpStr = genSdp(src,recvRemoteAudio,recvRemoteVideo);
                 sem.post();
                 return false;
             });
@@ -174,7 +197,7 @@ bool CallSession::Start() {
         return false;
     }
     MediaInfo info;
-    info._streamid = m_phoneNumber;
+    info._streamid = m_localPhoneNumber;
     info._vhost = DEFAULT_VHOST;
     info._app = SIP_APP;
     info._schema = RTSP_SCHEMA;
@@ -190,6 +213,9 @@ bool CallSession::Start() {
             args.use_ps = false;
             args.pt = m_sendAudioPt;
             args.ssrc = to_string(m_localAudioPort);
+            if(m_recvRemoteAudio){
+                args.recv_stream_id = args.ssrc;
+            }
             src->startSendRtp(args, [](uint16_t, const toolkit::SockException & e){
                 InfoL<<"audio start! "<<e.what();
             });
@@ -203,6 +229,10 @@ bool CallSession::Start() {
             args.use_ps = false;
             args.pt = m_sendVideoPt;
             args.ssrc = to_string(m_localVideoPort);
+            if(m_recvRemoteVideo){
+                args.recv_stream_id = args.ssrc;
+            }
+            updatePt();
             src->startSendRtp(args, [](uint16_t, const toolkit::SockException &e){
                 InfoL<<"video start! "<<e.what();
             });
@@ -212,7 +242,7 @@ bool CallSession::Start() {
 }
 
 bool CallSession::Stop() {
-    auto src = MediaSource::find(RTSP_SCHEMA,DEFAULT_VHOST,SIP_APP,m_phoneNumber);
+    auto src = MediaSource::find(RTSP_SCHEMA, DEFAULT_VHOST, SIP_APP, m_localPhoneNumber);
     if(!src){
         return true;
     }
@@ -226,4 +256,17 @@ string CallSession::getStreamUrl(const string &phoneNumber) {
 }
 
 CallSession::~CallSession() {
+}
+
+void CallSession::updatePt() {
+    smatch r;
+    auto lines = toolkit::split(m_remoteSdpStr,"\n");
+    for (const auto &item: lines){
+        if(regex_search(item,r,regex("a=rtpmap:(\\d+)\\s+(H264|H265|OPUS|PS)"))){
+            auto ptStr = "rtp_proxy."+strToLower(r.str(2)+"_pt");
+            auto pt = stoi(r.str(1));
+            mINI::Instance()[ptStr] = pt;
+        }
+    }
+    NoticeCenter::Instance().emitEvent(Broadcast::kBroadcastReloadConfig);
 }

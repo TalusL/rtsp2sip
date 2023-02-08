@@ -37,6 +37,8 @@ private:
     int m_remoteAudioPort{};
     int m_localVideoPort{};
     int m_remoteVideoPort{};
+    int m_sendVideoPt = 99;
+    int m_sendAudioPt = 0;
 
     static string getStreamUrl(const string& phoneNumber);
 };

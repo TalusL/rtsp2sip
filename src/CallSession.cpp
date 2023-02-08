@@ -115,6 +115,7 @@ string CallSession::GetLocalSdp() {
                     continue;
                 }
                 getSdpLine(m_remoteSdpStr,item->getCodecName(),pt,rtpmapLine,fmtpLine,profile);
+                m_sendVideoPt = pt;
                 localSdp <<"m=video "<<m_localVideoPort<<" RTP/AVP "<<pt<<"\r\n";
                 localSdp << rtpmapLine << "\r\n";
                 localSdp <<"a="
@@ -125,6 +126,7 @@ string CallSession::GetLocalSdp() {
             }
             if (item->getTrackType() == TrackAudio) {
                 getSdpLine(m_remoteSdpStr,item->getCodecName(),pt,rtpmapLine,fmtpLine,profile);
+                m_sendAudioPt = pt;
                 localSdp <<"m=audio "<<m_localAudioPort<<" RTP/AVP "<<pt<<"\r\n";
                 localSdp << rtpmapLine << "\r\n";
                 localSdp << "a=sendrecv\r\n";
@@ -159,6 +161,8 @@ string CallSession::GetLocalSdp() {
                 sem.post();
                 return false;
             });
+        }else{
+            sem.post();
         }
     });
     sem.wait();
@@ -184,7 +188,7 @@ bool CallSession::Start() {
             args.only_audio = true;
             args.is_udp = true;
             args.use_ps = false;
-            args.pt = 0;
+            args.pt = m_sendAudioPt;
             args.ssrc = to_string(m_localAudioPort);
             src->startSendRtp(args, [](uint16_t, const toolkit::SockException & e){
                 InfoL<<"audio start! "<<e.what();
@@ -197,7 +201,7 @@ bool CallSession::Start() {
             args.only_audio = false;
             args.is_udp = true;
             args.use_ps = false;
-            args.pt = 99;
+            args.pt = m_sendVideoPt;
             args.ssrc = to_string(m_localVideoPort);
             src->startSendRtp(args, [](uint16_t, const toolkit::SockException &e){
                 InfoL<<"video start! "<<e.what();

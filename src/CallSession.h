@@ -23,7 +23,7 @@ public:
     using Ptr = shared_ptr<CallSession>;
     explicit CallSession(const string& remoteSdp,const string& localPhoneNumber,const string& remotePhoneNumber);
     bool Init();
-    string GetLocalSdp(bool recvRemoteAudio = true,bool recvRemoteVideo = true);
+    string GetLocalSdp(bool recvRemoteAudio = true,bool recvRemoteVideo = false);
     bool Start();
     bool Stop();
 private:

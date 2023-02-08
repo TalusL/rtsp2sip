@@ -11,8 +11,10 @@ int main(){
 
 
     toolkit::mINI::Instance()["protocol.enable_hls"] = 0;
+    toolkit::mINI::Instance()["protocol.enable_rtmp"] = 0;
+    toolkit::mINI::Instance()["protocol.enable_ts"] = 0;
 
-    toolkit::mINI::Instance()["sip_proxy.8003"] = "rtsp://admin:123456@192.168.1.186/h264/ch1/main/av_stream";
+    toolkit::mINI::Instance()["sip_proxy.8003"] = "rtsp://admin:123456@192.168.1.151/stream=0";
 
     toolkit::mINI::Instance()["sip.expiry"] = 3600;
     toolkit::mINI::Instance()["sip.localPort"] = "5070";

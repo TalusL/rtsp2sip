@@ -9,20 +9,24 @@
 int main(){
     toolkit::Logger::Instance().add(std::make_shared<toolkit::ConsoleChannel>("ConsoleChannel", toolkit::LTrace));
 
+    InfoL<<"start!";
 
     toolkit::mINI::Instance()["protocol.enable_hls"] = 0;
     toolkit::mINI::Instance()["protocol.enable_rtmp"] = 0;
     toolkit::mINI::Instance()["protocol.enable_ts"] = 0;
 
-    toolkit::mINI::Instance()["sip_proxy.8003"] = "rtsp://admin:123456@192.168.1.151/stream=0";
 
     toolkit::mINI::Instance()["sip.expiry"] = 3600;
     toolkit::mINI::Instance()["sip.localPort"] = "5070";
     toolkit::mINI::Instance()["sip.localIp"] = toolkit::SockUtil::get_local_ip();
     toolkit::mINI::Instance()["sip.serverIp"] = "192.168.1.212";
     toolkit::mINI::Instance()["sip.serverPort"] = "5060";
-    toolkit::mINI::Instance()["sip.username"] = "8003";
-    toolkit::mINI::Instance()["sip.password"] = "8003";
+    toolkit::mINI::Instance()["sip.username"] = "8006";
+    toolkit::mINI::Instance()["sip.register"] = true;
+    toolkit::mINI::Instance()["sip.password"] = toolkit::mINI::Instance()["sip.username"];
+
+//    toolkit::mINI::Instance()["sip_proxy."+toolkit::mINI::Instance()["sip.username"]] = "rtsp://admin:lzh869189602@192.168.122.2/stream=0";
+    toolkit::mINI::Instance()["sip_proxy."+toolkit::mINI::Instance()["sip.username"]] = "rtsp://admin:lzh869189602@192.168.1.151/stream=0";
 
     SipClient sipClient;
     sipClient.StartStack();

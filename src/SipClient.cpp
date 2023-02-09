@@ -111,7 +111,16 @@ void SipClient::ProcessEvent() {
             }
         }
         switch (je->type) {
+            case EXOSIP_REGISTRATION_FAILURE:{
+                WarnL<<"REGISTRATION FAIL!";
+            }
+                break;
+            case EXOSIP_REGISTRATION_SUCCESS:{
+                InfoL<<"REGISTRATION OK!";
+            }
+                break;
             case EXOSIP_CALL_INVITE: {
+                InfoL<<"Call From:"<<je->request->from->url->username<<"\r\n"<<body;
                 CallSession::Ptr session = make_shared<CallSession>(body,je->request->to->url->username,je->request->from->url->username);
                 osip_message_t *respMsg = nullptr;
                 string sdp;
@@ -122,6 +131,7 @@ void SipClient::ProcessEvent() {
                         osip_message_set_content_type(respMsg, "application/sdp");
                         eXosip_call_send_answer(m_context, je->tid, 200, respMsg);
                     }
+                    InfoL<<"Local Sdp:\r\n"<<sdp;
                     g_sessionMap[to_string(je->cid)] = session;
                 }else{
                     int ret = eXosip_call_build_answer(m_context, je->tid, 400, &respMsg);
@@ -129,6 +139,7 @@ void SipClient::ProcessEvent() {
                         eXosip_call_send_answer(m_context, je->tid, 400, respMsg);
                     }
                     eXosip_call_terminate(m_context,je->cid,je->did);
+                    ErrorL<<"Call Fail!";
                 }
             }
                 break;
@@ -136,6 +147,7 @@ void SipClient::ProcessEvent() {
                 if(g_sessionMap.find(to_string(je->cid)) != g_sessionMap.end()){
                     g_sessionMap[to_string(je->cid)]->Start();
                 }
+                InfoL<<"Call Recv ACK!";
             }
             break;
             case EXOSIP_CALL_CANCELLED:
@@ -144,17 +156,19 @@ void SipClient::ProcessEvent() {
                     g_sessionMap[to_string(je->cid)]->Stop();
                 }
                 g_sessionMap.erase(to_string(je->cid));
+                InfoL<<"Call  Close!";
             }
             break;
             case EXOSIP_CALL_MESSAGE_NEW:{
                 osip_message_t *resp;
                 eXosip_call_build_answer(m_context,je->tid,200,&resp);
                 eXosip_call_send_answer(m_context,je->tid,200,resp);
+                InfoL<<"Call Recv Msg:\r\n"<<body;
             };
                 break;
             case EXOSIP_MESSAGE_NEW:
                 if(je->request&&je->request->sip_method==string("OPTIONS")){
-                    std::cout<<"OPTIONS"<<std::endl;
+                    InfoL<<"OPTIONS"<<std::endl;
                     sendResponse(je.get(),200);
                 }
                 break;

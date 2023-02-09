@@ -131,13 +131,15 @@ string CallSession::GetLocalSdp(bool recvRemoteAudio,bool recvRemoteVideo) {
                     continue;
                 }
                 getSdpLine(m_remoteSdpStr,item->getCodecName(),pt,rtpmapLine,fmtpLine,profile,audioTransportType,videoTransportType);
+                if(rtpmapLine.empty()){
+                    continue;
+                }
                 m_sendVideoPt = pt;
                 localSdp <<"m=video "<<m_localVideoPort<<" RTP/AVP "<<pt<<"\r\n";
                 localSdp << rtpmapLine << "\r\n";
-                localSdp <<"a="
-                           "fmtp:"<<pt;
                 getSdpLine(item->getSdp()->getSdp(),item->getCodecName(),pt,rtpmapLine,fmtpLine,profile,audioTransportType,videoTransportType);
-                localSdp <<" profile-level-id="<<profile<<"\r\n";
+                replace(fmtpLine,"fmtp:" + to_string(pt),"fmtp:" + to_string(m_sendVideoPt));
+                localSdp << fmtpLine << "\r\n";
                 if(recvRemoteVideo){
                     localSdp << "a="<<transportMap[videoTransportType]<<"\r\n";
                 }else{
@@ -146,6 +148,9 @@ string CallSession::GetLocalSdp(bool recvRemoteAudio,bool recvRemoteVideo) {
             }
             if (item->getTrackType() == TrackAudio) {
                 getSdpLine(m_remoteSdpStr,item->getCodecName(),pt,rtpmapLine,fmtpLine,profile,audioTransportType,videoTransportType);
+                if(rtpmapLine.empty()){
+                    continue;
+                }
                 m_sendAudioPt = pt;
                 localSdp <<"m=audio "<<m_localAudioPort<<" RTP/AVP "<<pt<<"\r\n";
                 localSdp << rtpmapLine << "\r\n";

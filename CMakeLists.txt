@@ -74,7 +74,7 @@ CHECK_FUNCTION_EXISTS("gmtime_r" HAVE_GMTIME_R)
 if(${HAVE_GETIFADDRS})
     add_definitions(-DHAVE_GMTIME_R)
 endif()
-add_definitions(-DHAVE_PTHREAD -DHAVE_STRUCT_TIMEVAL -DENABLE_TRACE)
+add_definitions(-DHAVE_PTHREAD -DHAVE_STRUCT_TIMEVAL)
 
 include_directories(3rd/libexosip2-5.3.0/include)
 include_directories(3rd/libosip2-5.3.1/include)

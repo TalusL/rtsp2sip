@@ -57,6 +57,7 @@ SipClient::SipClient() {
     m_serverPort = toolkit::mINI::Instance()["sip.serverPort"] ;
     m_username = toolkit::mINI::Instance()["sip.username"] ;
     m_password = toolkit::mINI::Instance()["sip.password"] ;
+    m_register = toolkit::mINI::Instance()["sip.register"] ;
 
     m_to = "sip:"+m_username+"@"+m_serverIp+":"+m_serverPort;
     m_from = "sip:"+m_username+"@"+m_localIp+":"+m_localPort;
@@ -83,7 +84,9 @@ bool SipClient::StartStack() {
         ProcessEvent();
     });
     m_pollingThread.detach();
-    registerUa();
+    if(m_register){
+        registerUa();
+    }
     return ret == OSIP_SUCCESS;
 }
 

@@ -28,6 +28,7 @@ private:
     string m_outboundProxy;
     string m_username;
     string m_password;
+    bool m_register = false;
     string m_from;
     string m_to;
 

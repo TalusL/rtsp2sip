@@ -214,7 +214,7 @@ bool CallSession::Start() {
             args.pt = m_sendAudioPt;
             args.ssrc = to_string(m_localAudioPort);
             if(m_recvRemoteAudio){
-                args.recv_stream_id = args.ssrc;
+                args.recv_stream_id = to_string(m_localAudioPort)+"_recv";
             }
             src->startSendRtp(args, [](uint16_t, const toolkit::SockException & e){
                 InfoL<<"audio start! "<<e.what();
@@ -230,7 +230,7 @@ bool CallSession::Start() {
             args.pt = m_sendVideoPt;
             args.ssrc = to_string(m_localVideoPort);
             if(m_recvRemoteVideo){
-                args.recv_stream_id = args.ssrc;
+                args.recv_stream_id = to_string(m_localVideoPort)+"_recv";
             }
             updatePt();
             src->startSendRtp(args, [](uint16_t, const toolkit::SockException &e){

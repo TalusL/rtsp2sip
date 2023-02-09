@@ -248,6 +248,14 @@ bool CallSession::Stop() {
     }
     src->stopSendRtp(to_string(m_localVideoPort));
     src->stopSendRtp(to_string(m_localAudioPort));
+    auto recv_vSrc = MediaSource::find(RTSP_SCHEMA, DEFAULT_VHOST, SIP_APP, to_string(m_localVideoPort)+"_recv");
+    if(recv_vSrc){
+        recv_vSrc->close(true);
+    }
+    auto recv_aSrc = MediaSource::find(RTSP_SCHEMA, DEFAULT_VHOST, SIP_APP, to_string(m_localAudioPort)+"_recv");
+    if(recv_aSrc){
+        recv_aSrc->close(true);
+    }
     return true;
 }
 

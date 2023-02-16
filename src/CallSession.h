@@ -36,8 +36,6 @@ private:
     bool m_recvRemoteAudio = true;
     bool m_recvRemoteVideo = false;
 
-    EventPoller::Ptr m_poller;
-
     static string getStreamUrl(const string& phoneNumber);
 
     void updatePt();

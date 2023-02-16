@@ -43,7 +43,6 @@ bool CallSession::Init() {
     if(!m_localAudioPort&&!m_localVideoPort){
         return false;
     }
-    m_poller = EventPollerPool::Instance().getPoller(false);
     m_mediaDestHost = m_remoteSdp.c_connection->c_addr;
     auto src = MediaSource::find(RTSP_SCHEMA, DEFAULT_VHOST, SIP_APP, m_localPhoneNumber);
     if(!src){
@@ -57,7 +56,7 @@ bool CallSession::Init() {
         s_proxyMap[m_localPhoneNumber] = mediaPlayer;
         {
             auto phUn = m_localPhoneNumber;
-            m_poller->doDelayTask(1000*10,[phUn](){
+            mediaPlayer->getPoller()->doDelayTask(1000*10,[phUn](){
                 if(s_proxyMap.find(phUn)!=s_proxyMap.end()){
                     auto src = MediaSource::find(RTSP_SCHEMA,DEFAULT_VHOST,SIP_APP,phUn);
                     if(src&&!src->totalReaderCount()){
@@ -166,7 +165,7 @@ string CallSession::GetLocalSdp(bool recvRemoteAudio,bool recvRemoteVideo) {
     };
 
     auto waitEnd = getCurrentMillisecond() + 10000;
-    m_poller->doDelayTask(100,[&](){
+    EventPollerPool::Instance().getPoller()->doDelayTask(100,[&](){
         auto src = MediaSource::find(RTSP_SCHEMA,DEFAULT_VHOST,SIP_APP,m_localPhoneNumber);
         if(!src&&getCurrentMillisecond()<waitEnd){
             return true;
@@ -213,8 +212,8 @@ bool CallSession::Start() {
     info._schema = RTSP_SCHEMA;
     auto src = MediaSource::find(info);
     if(src){
-        MediaSourceEvent::SendRtpArgs args;
         if(m_localAudioPort){
+            MediaSourceEvent::SendRtpArgs args;
             args.dst_port = m_remoteAudioPort;
             args.src_port = m_localAudioPort;
             args.dst_url = m_mediaDestHost;
@@ -231,6 +230,7 @@ bool CallSession::Start() {
             });
         }
         if(m_localVideoPort){
+            MediaSourceEvent::SendRtpArgs args;
             args.dst_port = m_remoteVideoPort;
             args.src_port = m_localVideoPort;
             args.dst_url = m_mediaDestHost;

@@ -43,6 +43,7 @@ bool CallSession::Init() {
     if(!m_localAudioPort&&!m_localVideoPort){
         return false;
     }
+    m_poller = EventPollerPool::Instance().getPoller(false);
     m_mediaDestHost = m_remoteSdp.c_connection->c_addr;
     auto src = MediaSource::find(RTSP_SCHEMA, DEFAULT_VHOST, SIP_APP, m_localPhoneNumber);
     if(!src){
@@ -56,7 +57,7 @@ bool CallSession::Init() {
         s_proxyMap[m_localPhoneNumber] = mediaPlayer;
         {
             auto phUn = m_localPhoneNumber;
-            getPoller()->doDelayTask(1000*10,[phUn](){
+            m_poller->doDelayTask(1000*10,[phUn](){
                 if(s_proxyMap.find(phUn)!=s_proxyMap.end()){
                     auto src = MediaSource::find(RTSP_SCHEMA,DEFAULT_VHOST,SIP_APP,phUn);
                     if(src&&!src->totalReaderCount()){
@@ -163,35 +164,39 @@ string CallSession::GetLocalSdp(bool recvRemoteAudio,bool recvRemoteVideo) {
         }
         return localSdp.str();
     };
-    MediaSource::findAsync(info, this->shared_from_this(), [&](const std::shared_ptr<MediaSource> &src) {
-        if (src) {
-            auto waitEnd = getCurrentMillisecond() + 10000;
-            getPoller()->doDelayTask(100,[&,src](){
-                if(m_localVideoPort&&!src->getTrack(TrackType::TrackVideo)&&getCurrentMillisecond()<waitEnd){
-                    return true;
-                }
-                if(m_localAudioPort&&!src->getTrack(TrackType::TrackAudio)&&getCurrentMillisecond()<waitEnd ){
-                    return true;
-                }
-                auto aTrack = src->getTrack(TrackType::TrackAudio);
-                auto vTrack = src->getTrack(TrackType::TrackVideo);
-                if(aTrack){
-                    if (!aTrack->ready()&&getCurrentMillisecond()<waitEnd){
-                        return true;
-                    }
-                }
-                if(vTrack){
-                    if (!vTrack->ready()&&getCurrentMillisecond()<waitEnd){
-                        return true;
-                    }
-                }
-                m_localSdpStr = genSdp(src,recvRemoteAudio,recvRemoteVideo);
-                sem.post();
-                return false;
-            });
-        }else{
-            sem.post();
+
+    auto waitEnd = getCurrentMillisecond() + 10000;
+    m_poller->doDelayTask(100,[&](){
+        auto src = MediaSource::find(RTSP_SCHEMA,DEFAULT_VHOST,SIP_APP,m_localPhoneNumber);
+        if(!src&&getCurrentMillisecond()<waitEnd){
+            return true;
         }
+        if(!src){
+            sem.post();
+            return false;
+        }
+
+        if(m_localVideoPort&&!src->getTrack(TrackType::TrackVideo)&&getCurrentMillisecond()<waitEnd){
+            return true;
+        }
+        if(m_localAudioPort&&!src->getTrack(TrackType::TrackAudio)&&getCurrentMillisecond()<waitEnd ){
+            return true;
+        }
+        auto aTrack = src->getTrack(TrackType::TrackAudio);
+        auto vTrack = src->getTrack(TrackType::TrackVideo);
+        if(aTrack){
+            if (!aTrack->ready()&&getCurrentMillisecond()<waitEnd){
+                return true;
+            }
+        }
+        if(vTrack){
+            if (!vTrack->ready()&&getCurrentMillisecond()<waitEnd){
+                return true;
+            }
+        }
+        m_localSdpStr = genSdp(src,recvRemoteAudio,recvRemoteVideo);
+        sem.post();
+        return false;
     });
     sem.wait();
     return m_localSdpStr;

@@ -25,8 +25,9 @@ int main(){
     toolkit::mINI::Instance()["sip.register"] = true;
     toolkit::mINI::Instance()["sip.password"] = toolkit::mINI::Instance()["sip.username"];
 
-//    toolkit::mINI::Instance()["sip_proxy."+toolkit::mINI::Instance()["sip.username"]] = "rtsp://admin:lzh869189602@192.168.122.2/stream=0";
-    toolkit::mINI::Instance()["sip_proxy."+toolkit::mINI::Instance()["sip.username"]] = "rtsp://admin:lzh869189602@192.168.1.151/stream=0";
+    toolkit::mINI::Instance()["sip_proxy."+toolkit::mINI::Instance()["sip.username"]] = "rtsp://admin:Nucleus!@10.8.9.181/h264/ch1/main/av_stream";
+    toolkit::mINI::Instance()["sip_proxy.44030123652152169840"] = "rtsp://admin:Nucleus!@10.8.9.181/h264/ch1/main/av_stream";
+
 
     SipClient sipClient;
     sipClient.StartStack();

@@ -9,17 +9,10 @@
 using namespace std;
 using namespace toolkit;
 
-class FakeSession : public Session{
-public:
-    explicit FakeSession() :  Session(Socket::createSocket()){}
-    void onRecv(const Buffer::Ptr &buf) override {}
-    void onError(const SockException &err) override {}
-    void onManager() override {}
-};
 
-class CallSession:public FakeSession {
+class CallSession {
 public:
-    ~CallSession() override;
+    ~CallSession();
     using Ptr = shared_ptr<CallSession>;
     explicit CallSession(const string& remoteSdp,const string& localPhoneNumber,const string& remotePhoneNumber);
     bool Init();
@@ -42,6 +35,8 @@ private:
     int m_sendAudioPt = 0;
     bool m_recvRemoteAudio = true;
     bool m_recvRemoteVideo = false;
+
+    EventPoller::Ptr m_poller;
 
     static string getStreamUrl(const string& phoneNumber);
 

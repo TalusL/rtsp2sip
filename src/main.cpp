@@ -1,10 +1,9 @@
 #include "SipClient.h"
-#include <Rtsp/RtspSession.h>
-#include <Network/TcpServer.h>
 #include <Util/logger.h>
 #include <Util/mini.h>
 #include <Network/Socket.h>
 #include <csignal>
+#include <Common/config.h>
 
 int main(){
     toolkit::Logger::Instance().add(std::make_shared<toolkit::ConsoleChannel>("ConsoleChannel", toolkit::LTrace));
@@ -25,9 +24,9 @@ int main(){
     toolkit::mINI::Instance()["sip.register"] = true;
     toolkit::mINI::Instance()["sip.password"] = toolkit::mINI::Instance()["sip.username"];
 
-    toolkit::mINI::Instance()["sip_proxy."+toolkit::mINI::Instance()["sip.username"]] = "rtsp://admin:Nucleus!@10.8.9.181/h264/ch1/main/av_stream";
-    toolkit::mINI::Instance()["sip_proxy.44030123652152169840"] = "rtsp://admin:Nucleus!@10.8.9.181/h264/ch1/main/av_stream";
+    toolkit::mINI::Instance()["sip_proxy."+toolkit::mINI::Instance()["sip.username"]] = "rtsp://admin:123456@192.168.122.2/stream=0";
 
+    mediakit::loadIniConfig((toolkit::exeDir()+"/rtsp2sip.ini").c_str());
 
     SipClient sipClient;
     sipClient.StartStack();

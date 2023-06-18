@@ -48,6 +48,8 @@ bool CallSession::Init() {
     if(!src){
         ProtocolOption option;
         PlayerProxy::Ptr mediaPlayer = std::make_shared<PlayerProxy>(DEFAULT_VHOST, SIP_APP, m_localPhoneNumber, option, 2);
+        //RTSP OVER TCP
+        (*mediaPlayer)[Client::kRtpType] = Rtsp::RTP_TCP;
         auto url = getStreamUrl(m_localPhoneNumber);
         if(url.empty()){
             return false;

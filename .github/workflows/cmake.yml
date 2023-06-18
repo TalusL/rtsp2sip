@@ -37,4 +37,11 @@ jobs:
       # Execute tests defined by the CMake configuration.
       # See https://cmake.org/cmake/help/latest/manual/ctest.1.html for more detail
       run: ctest -C ${{env.BUILD_TYPE}}
+      
+    - name: 'Upload Artifact'
+      uses: actions/upload-artifact@v3
+      with:
+        name: builds
+        path: build/rtsp2sip
+        retention-days: 5
 

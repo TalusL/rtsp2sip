@@ -121,6 +121,12 @@ string CallSession::GetLocalSdp(bool recvRemoteAudio,bool recvRemoteVideo) {
                 if(regex_search(sdp,vr,regex("m=video[\\S\\s]*?(sendonly|recvonly|sendrecv)"))){
                     videoTransportType = vr.str(1);
                 }
+                if(audioTransportType.empty()){
+                    audioTransportType = "sendrecv";
+                }
+                if(videoTransportType.empty()){
+                    videoTransportType = "sendrecv";
+                }
             }
         };
 
